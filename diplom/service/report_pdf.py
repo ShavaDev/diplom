@@ -13,6 +13,7 @@ def generate_certificate(fullname: str, test_name: str,
 
     # 2. Создаем объект PDF
     # pagesize='A4' задаст стандартный лист.
+    # "Рисуй всё, что я скажу, вот в этот buffer".
     p = canvas.Canvas(buffer)
     try:
         # Указываем имя, которое мы хотим использовать ('MyFont'), и имя файла ('Roboto-Regular.ttf')
@@ -51,8 +52,12 @@ def generate_certificate(fullname: str, test_name: str,
     p.drawString(150, 500, f"Итоговый балл: {score}")
 
     # сохраняем
-    p.showPage()
-    p.save()
+    p.showPage()  # "Я закончил страницу"
+    p.save()  # "Сохрани результат!"
+    # В ЭТОТ МОМЕНТ (p.save) библиотека ReportLab берет все рисунки,
+    # превращает их в сложный двоичный код PDF-файла (%PDF-1.4...)
+    # и ЗАПИСЫВАЕТ этот код внутрь нашего variable 'buffer'.
 
+    # 5. Перемотка курсора на начало координат
     buffer.seek(0)
     return buffer

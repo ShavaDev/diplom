@@ -28,9 +28,9 @@ def create_test_db(author_id: int, test_data: TestCreateSchema):
 
 
 # удаление теста (для учителя)
-def delete_test_db(pk: int):
+def delete_test_db(test_id: int):
     with session_db() as db:
-        test = db.get(Test, id=pk)
+        test = db.get(Test, id=test_id)
         if not test:
             raise HTTPException()
         db.delete(test)
@@ -44,7 +44,13 @@ def test_submit_db(author_id: int, test_data: TestSubmitSchema):
         score = 0
         test = db.get(Test, id=test_data.test_id)
         if not test:
-            return "Тест не найден"
+            return None
+
+        # Логика проверки на дубликаты вопросов
+        answered_questions = [a.question_id for a in test_data.answers]
+        if len(answered_questions) != len(set(answered_questions)):
+            return None
+
         # Перебираем ответы, которые прислал студент в схеме
         for student_answer in test_data.answers:
             # Достаем этот вариант из базы
@@ -74,16 +80,20 @@ def get_all_tests_db():
         tests = db.query(Test).all()
         if tests:
             return tests
-        return 'Тесты не найдены!'
+        return None
 
 
-# получение одно теста для студента
+# получение одного теста для студента
 def get_exact_test_db(test_id: int):
     with session_db() as db:
-        test = db.get(Test, id=test_id)
+        # Используем joinedload, чтобы сразу подтянуть вопросы и ответы для студента
+        test = db.query(Test) \
+            .options(joinedload(Test.questions). \
+                     joinedload(Question.options)). \
+            filter(Test.id == test_id).first()
         if test:
             return test
-        return "Тест не найден!"
+        return None
 
 
 # получение попыток пользователя
@@ -92,7 +102,7 @@ def get_user_attempts_db(author_id: int):
         attempts = db.query(Attempt).filter(Attempt.author_id == author_id).all()
         if attempts:
             return attempts
-        return "Тесты еще не были пройдены"
+        return None
 
 
 # результаты теста для учителя
@@ -103,3 +113,13 @@ def get_test_results_db(test_id: int):
             .filter(Attempt.test_id == test_id) \
             .all()
         return results
+
+
+# для скачивания сертификата
+def get_exact_attempt_db(attempt_id: int):
+    with session_db() as db:
+        # Подгружаем попытку сразу вместе с Тестом (чтобы взять название)
+        attempt = db.query(Attempt). \
+            options(joinedload(Attempt.test)). \
+            filter(Attempt.id == attempt_id).first()
+        return attempt
