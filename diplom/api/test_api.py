@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from starlette.responses import StreamingResponse
-
 from database.models import User
 from database.schemas import TestCreateSchema, TestSubmitSchema
 from deps import get_current_user
 from service.test_service import *
 from service.report_pdf import generate_certificate
+from main import limiter
 
 test_router = APIRouter(prefix="/test", tags=["Test API"])
 
@@ -60,7 +60,9 @@ async def get_exact_test_api(test_id: int, current_user: User = Depends(get_curr
 
 
 @test_router.post("/{test_id}/questions/submit")
-async def submit_test_api(test_id: int, user_test: TestSubmitSchema,
+@limiter.limit("5/minute")
+async def submit_test_api(request: Request,
+                          test_id: int, user_test: TestSubmitSchema,
                           current_user: User = Depends(get_current_user)):
     # 1. Проверка на дурака: совпадают ли ID в URL и в теле?
     if test_id != user_test.test_id:
@@ -94,6 +96,7 @@ async def submit_test_api(test_id: int, user_test: TestSubmitSchema,
 
 
 @test_router.get("/result/{attempt_id}/certificate")
+@limiter.limit("10/minute")
 async def get_certificate_api(attempt_id: int, current_user: User = Depends(get_current_user)):
     user_attempt = get_exact_attempt_db(attempt_id=attempt_id)
     if not user_attempt:

@@ -6,11 +6,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from security import create_access_token, verify_password
 from fastapi import Depends, HTTPException, status, Response
 from deps import get_current_user
+from main import limiter
 
 user_router = APIRouter(prefix="/user", tags=["User API"])
 
 
 @user_router.post("/register")
+@limiter.limit("3/minute")
 async def create_user_api(user_data: UserCreateSchema):
     result = create_user_db(user_data=user_data)
     if result:
@@ -19,6 +21,7 @@ async def create_user_api(user_data: UserCreateSchema):
 
 
 @user_router.post("/login")
+@limiter.limit("5/minute")
 async def login_user_api(response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
     # 1. Ищем пользователя
     current_user = get_user_by_username_db(username=form_data.username)
