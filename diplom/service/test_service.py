@@ -30,7 +30,7 @@ def create_test_db(author_id: int, test_data: TestCreateSchema):
 # удаление теста (для учителя)
 def delete_test_db(test_id: int):
     with session_db() as db:
-        test = db.get(Test, id=test_id)
+        test = db.get(Test, test_id)
         if not test:
             raise HTTPException()
         db.delete(test)
@@ -42,7 +42,9 @@ def delete_test_db(test_id: int):
 def test_submit_db(author_id: int, test_data: TestSubmitSchema):
     with session_db() as db:
         score = 0
-        test = db.get(Test, id=test_data.test_id)
+        test = db.query(Test) \
+            .options(joinedload(Test.questions)) \
+            .filter(Test.id == test_data.test_id).first()
         if not test:
             return None
 
@@ -54,7 +56,7 @@ def test_submit_db(author_id: int, test_data: TestSubmitSchema):
         # Перебираем ответы, которые прислал студент в схеме
         for student_answer in test_data.answers:
             # Достаем этот вариант из базы
-            option = db.get(Option, id=student_answer.option_id)
+            option = db.get(Option, student_answer.option_id)
             # Проверяем: существует ли такой вариант И правильный ли он
             if option and option.is_correct:
                 # ВАЖНО: Тут еще стоит проверить, что этот вариант
@@ -64,7 +66,7 @@ def test_submit_db(author_id: int, test_data: TestSubmitSchema):
                     score += 1
         end_time = datetime.now()
         attempt = Attempt(
-            test=test, score=score,
+            score=score,
             author_id=author_id,
             test_id=test.id, completed=True,
             end_time=end_time)
