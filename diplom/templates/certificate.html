@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduTest — Сертификат</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+<nav class="bg-blue-600 text-white p-4 shadow-lg">
+    <div class="container mx-auto flex justify-between items-center">
+        <a href="/" class="text-2xl font-bold">🎓 EduTest</a>
+        <div class="text-blue-100 text-sm">Сертификат</div>
+    </div>
+</nav>
+
+<main class="container mx-auto mt-8 p-4">
+    <section class="bg-white rounded-2xl shadow p-6">
+        <h1 class="text-2xl font-bold text-gray-800">Сертификат по попытке №<span
+                id="attempt-id">{{ attempt_id }}</span></h1>
+        <p class="text-gray-500 mt-2">
+            Если тест пройден, нажмите кнопку ниже, чтобы скачать сертификат в PDF.
+        </p>
+
+        <div id="attempt-info" class="mt-6 space-y-3 text-gray-700"></div>
+
+        <div class="mt-6 flex flex-col md:flex-row md:items-center gap-4">
+            <a id="download-link"
+               class="inline-flex items-center justify-center bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
+               href="#">
+                Скачать сертификат
+            </a>
+            <a href="/" class="text-blue-600 font-semibold hover:underline">Вернуться на главную</a>
+        </div>
+
+        <div id="certificate-error" class="hidden mt-4 p-4 rounded-lg bg-red-50 text-red-700"></div>
+    </section>
+</main>
+
+<script>
+    const attemptId = Number("{{ attempt_id }}");
+    const attemptInfo = document.getElementById('attempt-info');
+    const downloadLink = document.getElementById('download-link');
+    const certificateError = document.getElementById('certificate-error');
+
+    const showError = (message) => {
+        certificateError.textContent = message;
+        certificateError.classList.remove('hidden');
+    };
+
+    const loadAttemptInfo = async () => {
+        try {
+            const response = await fetch('/test/user_attempts', { credentials: 'include' });
+            if (!response.ok) {
+                showError('Не удалось загрузить информацию о попытке.');
+                return;
+            }
+            const attempts = await response.json();
+            const currentAttempt = attempts.find((attempt) => attempt.id === attemptId);
+            if (!currentAttempt) {
+                attemptInfo.innerHTML = '<p>Информация о попытке не найдена. Проверьте корректность ссылки.</p>';
+                return;
+            }
+            attemptInfo.innerHTML = `
+                <p><strong>Баллы:</strong> ${currentAttempt.score}</p>
+                <p><strong>Статус:</strong> ${currentAttempt.completed ? 'Завершен' : 'Не завершен'}</p>
+                <p><strong>Начало:</strong> ${new Date(currentAttempt.start_time).toLocaleString('ru-RU')}</p>
+                <p><strong>Окончание:</strong> ${currentAttempt.end_time ? new Date(currentAttempt.end_time).toLocaleString('ru-RU') : '—'}</p>
+            `;
+        } catch (error) {
+            console.error(error);
+            showError('Ошибка соединения с сервером.');
+        }
+    };
+
+    downloadLink.href = `/test/result/${attemptId}/certificate`;
+    loadAttemptInfo();
+</script>
+</body>
+</html>

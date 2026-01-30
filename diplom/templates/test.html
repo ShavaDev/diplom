@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduTest — Прохождение теста</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+<nav class="bg-blue-600 text-white p-4 shadow-lg">
+    <div class="container mx-auto flex justify-between items-center">
+        <a href="/" class="text-2xl font-bold">🎓 EduTest</a>
+        <div class="text-blue-100 text-sm">Прохождение теста</div>
+    </div>
+</nav>
+
+<main class="container mx-auto mt-8 p-4">
+    <section class="bg-white rounded-2xl shadow p-6 mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Тест №<span id="test-id">{{ test_id }}</span></h1>
+        <p class="text-gray-500 mt-2">
+            Ответьте на все вопросы и нажмите «Отправить», чтобы получить результат.
+        </p>
+        <div id="load-error" class="hidden mt-4 p-4 rounded-lg bg-red-50 text-red-700"></div>
+    </section>
+
+    <section id="questions-section" class="space-y-6"></section>
+
+    <section class="mt-8">
+        <button id="submit-btn"
+                class="w-full md:w-auto bg-green-500 text-white py-3 px-6 rounded-xl font-bold hover:bg-green-600 transition disabled:opacity-50"
+                disabled>
+            Отправить ответы
+        </button>
+        <div id="result-card" class="hidden mt-6 bg-white shadow rounded-2xl p-6 border border-green-100">
+            <h2 class="text-xl font-bold text-gray-800">Результат</h2>
+            <div id="result-content" class="mt-3 text-gray-600 space-y-2"></div>
+            <a id="certificate-link"
+               class="hidden mt-4 inline-flex items-center text-blue-600 font-semibold hover:underline"
+               href="#">
+                Скачать сертификат
+            </a>
+        </div>
+    </section>
+</main>
+
+<script>
+    const testId = Number("{{ test_id }}");
+    const submitBtn = document.getElementById('submit-btn');
+    const questionsSection = document.getElementById('questions-section');
+    const loadError = document.getElementById('load-error');
+    const resultCard = document.getElementById('result-card');
+    const resultContent = document.getElementById('result-content');
+    const certificateLink = document.getElementById('certificate-link');
+
+    const showError = (message) => {
+        loadError.textContent = message;
+        loadError.classList.remove('hidden');
+    };
+
+    const renderQuestions = (questions) => {
+        questionsSection.innerHTML = '';
+        questions.forEach((question, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'bg-white rounded-2xl shadow p-6 border border-slate-100';
+            wrapper.innerHTML = `
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    ${index + 1}. ${question.text}
+                </h3>
+                <div class="space-y-3">
+                    ${question.options.map(option => `
+                        <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                            <input type="radio" name="question-${question.id}" value="${option.id}"
+                                   class="h-4 w-4 text-blue-600">
+                            <span class="text-gray-700">${option.option_text}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            `;
+            questionsSection.appendChild(wrapper);
+        });
+        submitBtn.disabled = questions.length === 0;
+    };
+
+    const loadQuestions = async () => {
+        try {
+            const response = await fetch(`/test/${testId}/questions`, { credentials: 'include' });
+            if (!response.ok) {
+                if (response.status === 401) {
+                    showError('Чтобы пройти тест, войдите в систему и повторите попытку.');
+                    return;
+                }
+                showError('Не удалось загрузить вопросы. Попробуйте позже.');
+                return;
+            }
+            const questions = await response.json();
+            renderQuestions(questions);
+        } catch (error) {
+            console.error(error);
+            showError('Ошибка соединения с сервером.');
+        }
+    };
+
+    const collectAnswers = () => {
+        const answers = [];
+        document.querySelectorAll('[name^="question-"]').forEach((input) => {
+            if (input.checked) {
+                const questionId = Number(input.name.replace('question-', ''));
+                answers.push({ question_id: questionId, option_id: Number(input.value) });
+            }
+        });
+        return answers;
+    };
+
+    submitBtn.addEventListener('click', async () => {
+        submitBtn.disabled = true;
+        resultCard.classList.add('hidden');
+        const answers = collectAnswers();
+        if (answers.length === 0) {
+            showError('Выберите хотя бы один ответ перед отправкой.');
+            submitBtn.disabled = false;
+            return;
+        }
+
+        try {
+            const response = await fetch(`/test/${testId}/questions/submit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ test_id: testId, answers })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                showError(data.detail || 'Не удалось отправить тест.');
+                submitBtn.disabled = false;
+                return;
+            }
+
+            resultContent.innerHTML = `
+                <p>Правильных ответов: <strong>${data.user_score}</strong> из <strong>${data.total_questions}</strong>.</p>
+                <p>Процент выполнения: <strong>${data.user_score_percentage}%</strong>.</p>
+                <p>${data.is_passed ? 'Тест пройден, сертификат доступен.' : 'Тест не пройден, попробуйте ещё раз.'}</p>
+            `;
+
+            if (data.is_passed) {
+                certificateLink.href = `/certificate/${data.attempt_id}`;
+                certificateLink.classList.remove('hidden');
+            } else {
+                certificateLink.classList.add('hidden');
+            }
+
+            resultCard.classList.remove('hidden');
+        } catch (error) {
+            console.error(error);
+            showError('Ошибка при отправке теста.');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
+    loadQuestions();
+</script>
+</body>
+</html>

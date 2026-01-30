@@ -44,5 +44,19 @@ async def home_page(request: Request):
                                       context={"all_tests": all_tests})
 
 
+@app.get("/tests/{test_id}", response_class=HTMLResponse)
+async def test_page(request: Request, test_id: int):
+    return templates.TemplateResponse(request=request,
+                                      name="test.html",
+                                      context={"test_id": test_id})
+
+
+@app.get("/certificate/{attempt_id}", response_class=HTMLResponse)
+async def certificate_page(request: Request, attempt_id: int):
+    return templates.TemplateResponse(request=request,
+                                      name="certificate.html",
+                                      context={"attempt_id": attempt_id})
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
