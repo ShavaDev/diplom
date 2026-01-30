@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from contextlib import contextmanager
 
-DATABASE = "postgresql+psycopg2://username:password@localhost/diplom"
+DATABASE = "postgresql+psycopg2://postgres:14092022shb@localhost/diplom"
 
 engine = create_engine(DATABASE, echo=True,
                        pool_size=20,

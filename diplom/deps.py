@@ -7,7 +7,9 @@ from service.user_service import get_user_by_username_db
 # ВАЖНО: Эта настройка говорит Swagger UI, куда отправлять логин/пароль, чтобы получить токен.
 # Мы скоро создадим этот адрес: /user/login
 # tokenUrl="/user/login" значит, что Swagger будет стучаться по этому адресу, чтобы получить токен.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
+# Делаем auto_error=False, чтобы зависимость не выкидывала 401 раньше времени,
+# если заголовок Authorization отсутствует.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login", auto_error=False)
 
 
 def _credentials_exception():

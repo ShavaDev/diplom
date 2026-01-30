@@ -1,4 +1,4 @@
-from basa import Base
+from database.basa import Base
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy import String, ForeignKey
 from typing import List
@@ -39,7 +39,7 @@ class Test(Base):
     author: Mapped['User'] = relationship("User", back_populates="tests", lazy="selectin")
 
     # связываем с Question
-    questions: Mapped[List['Question']] = relationship("Question", back_populates="author",
+    questions: Mapped[List['Question']] = relationship("Question", back_populates="test",
                                                        passive_deletes=True)
 
     # обратная связь с Attempt

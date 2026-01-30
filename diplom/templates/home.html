@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LMS Diploma - Система тестирования</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .test-card:hover { transform: translateY(-5px); transition: 0.3s; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+<nav class="bg-blue-600 text-white p-4 shadow-lg">
+    <div class="container mx-auto flex justify-between items-center">
+        <h1 class="text-2xl font-bold">🎓 EduTest</h1>
+
+        <div id="auth-buttons" class="flex">
+            <button onclick="showModal('login')"
+                    class="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold mr-2 hover:bg-gray-100">
+                Вход
+            </button>
+            <button onclick="showModal('register')"
+                    class="border border-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700">
+                Регистрация
+            </button>
+        </div>
+
+        <div id="user-profile" class="hidden flex items-center">
+            <span class="mr-2 text-blue-100">Привет,</span>
+            <span id="user-name" class="mr-4 font-bold text-white underline decoration-blue-300"></span>
+            <button onclick="logout()"
+                    class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm font-bold transition">
+                Выйти
+            </button>
+        </div>
+    </div>
+</nav>
+
+<main class="container mx-auto mt-10 p-4">
+    <div id="tests-container" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {% if all_tests %}
+        {% for test in all_tests %}
+        <div class="bg-white p-6 rounded-xl shadow test-card border border-gray-200">
+            <h3 class="text-xl font-bold mb-2 text-gray-800">{{ test.title }}</h3>
+            <p class="text-gray-600 mb-4 font-medium italic">Ограничение: {{ test.timer // 60 }} мин.</p>
+            <button onclick="startTest({{ test.id }})"
+                    class="w-full bg-green-500 text-white py-2 rounded-lg font-bold hover:bg-green-600 transition shadow-sm">
+                Начать тест
+            </button>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="col-span-full bg-white p-10 rounded-xl shadow text-center">
+            <p class="text-gray-500 text-lg">Тесты пока не добавлены.</p>
+        </div>
+        {% endif %}
+    </div>
+</main>
+
+<div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-96">
+        <h2 id="modal-title" class="text-2xl font-bold mb-6 text-center text-gray-800 border-b pb-2"></h2>
+        <form id="auth-form" class="space-y-4">
+            <input type="text" id="username" placeholder="Логин"
+                   class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none" required>
+            <div id="reg-fields" class="hidden">
+                <input type="text" id="fullname" placeholder="Полное имя (ФИО)"
+                       class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none">
+            </div>
+            <input type="password" id="password" placeholder="Пароль"
+                   class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none" required>
+            <button type="submit"
+                    class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition">
+                Продолжить
+            </button>
+            <button type="button" onclick="closeModal()" class="w-full text-gray-500 mt-2 hover:underline">Отмена
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentMode = 'login';
+
+    // 1. Улучшенная проверка авторизации
+    async function checkAuth() {
+        try {
+        // Явно указываем, что нам нужны credentials (куки)
+        const res = await fetch(`/user/me`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        const authButtons = document.getElementById('auth-buttons');
+        const userProfile = document.getElementById('user-profile');
+        const userNameDisplay = document.getElementById('user-name');
+
+        if (res.ok) {
+            const user = await res.json();
+            authButtons.classList.add('hidden');
+            userProfile.classList.remove('hidden');
+            userNameDisplay.innerText = user.fullname;
+        } else {
+            // Если получили 401, значит куки нет или она невалидна
+            authButtons.classList.remove('hidden');
+            userProfile.classList.add('hidden');
+        }
+    } catch (e) {
+        console.error("Ошибка авторизации:", e);
+    }
+}
+
+    // 2. Исправленный вход (Login)
+    document.getElementById('auth-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        if (currentMode === 'login') {
+            const formData = new URLSearchParams();
+            formData.append('username', username);
+            formData.append('password', password);
+
+            const res = await fetch(`/user/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData,
+                credentials: 'include' // Важно для сохранения кук
+            });
+
+            if (res.ok) {
+                console.log("Вход выполнен успешно");
+                location.reload();
+            } else {
+                const data = await res.json();
+                alert("Ошибка: " + (data.detail || "Неверный логин или пароль"));
+            }
+        } else {
+            // Код регистрации остается прежним
+            const fullname = document.getElementById('fullname').value;
+            const res = await fetch(`/user/register`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password, fullname})
+            });
+
+            if (res.ok) {
+                alert("Регистрация успешна! Войдите в систему.");
+                showModal('login');
+            } else {
+                const data = await res.json();
+                alert("Ошибка регистрации: " + (data.detail || "Ошибка"));
+            }
+        }
+    };
+
+    function showModal(mode) {
+        currentMode = mode;
+        document.getElementById('modal').classList.remove('hidden');
+        document.getElementById('modal-title').innerText = mode === 'login' ? 'Вход' : 'Регистрация';
+        document.getElementById('reg-fields').classList.toggle('hidden', mode === 'login');
+    }
+
+    function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+    async function logout() {
+        await fetch(`/user/logout`, { method: 'POST', credentials: 'include' });
+        location.reload();
+    }
+
+    function startTest(id) {
+        if (document.getElementById('user-profile').classList.contains('hidden')) {
+            alert("Пожалуйста, войдите, чтобы пройти тест.");
+            showModal('login');
+            return;
+        }
+        alert("Запуск теста №" + id);
+    }
+
+    // Запускаем проверку
+    checkAuth();
+</script>
+</body>
+</html>

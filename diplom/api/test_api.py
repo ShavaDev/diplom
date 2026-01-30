@@ -5,7 +5,7 @@ from database.schemas import TestCreateSchema, TestSubmitSchema
 from deps import get_current_user
 from service.test_service import *
 from service.report_pdf import generate_certificate
-from main import limiter
+from limiter_config import limiter
 
 test_router = APIRouter(prefix="/test", tags=["Test API"])
 
@@ -97,7 +97,8 @@ async def submit_test_api(request: Request,
 
 @test_router.get("/result/{attempt_id}/certificate")
 @limiter.limit("10/minute")
-async def get_certificate_api(attempt_id: int, current_user: User = Depends(get_current_user)):
+async def get_certificate_api(request: Request,
+                              attempt_id: int, current_user: User = Depends(get_current_user)):
     user_attempt = get_exact_attempt_db(attempt_id=attempt_id)
     if not user_attempt:
         raise HTTPException(

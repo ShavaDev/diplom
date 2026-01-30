@@ -33,8 +33,7 @@ def delete_user_db(user_id: int):
         user = db.query(User).filter(User.id == user_id).first()
         db.delete(user)
         db.commit()
-        db.refresh(user)
-        return "Пользователь удален"
+        return True
 
 
 def change_role_to_teacher_db(user_id: int):

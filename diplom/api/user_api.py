@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from service.user_service import *
 from database.schemas import UserCreateSchema
 from database.models import User
@@ -6,14 +6,15 @@ from fastapi.security import OAuth2PasswordRequestForm
 from security import create_access_token, verify_password
 from fastapi import Depends, HTTPException, status, Response
 from deps import get_current_user
-from main import limiter
+from limiter_config import limiter
 
 user_router = APIRouter(prefix="/user", tags=["User API"])
 
 
 @user_router.post("/register")
 @limiter.limit("3/minute")
-async def create_user_api(user_data: UserCreateSchema):
+async def create_user_api(request: Request,
+                          user_data: UserCreateSchema):
     result = create_user_db(user_data=user_data)
     if result:
         return "User created successfully"
@@ -22,7 +23,8 @@ async def create_user_api(user_data: UserCreateSchema):
 
 @user_router.post("/login")
 @limiter.limit("5/minute")
-async def login_user_api(response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_user_api(request: Request,
+                         response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
     # 1. Ищем пользователя
     current_user = get_user_by_username_db(username=form_data.username)
     if not current_user:
@@ -39,7 +41,11 @@ async def login_user_api(response: Response, form_data: OAuth2PasswordRequestFor
     # 3. Генерируем токен
     access_token = create_access_token(data={"sub": current_user.username})
     # 4. Устанавливаем куки (просто вызываем метод)
-    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
+    response.set_cookie(key="access_token", value=f"Bearer {access_token}",
+                        httponly=True,
+                        samesite="lax", # Помогает с передачей кук на localhost
+                        secure=False, # Для локальной разработки без HTTPS ставим False
+                        path="/") # Чтобы кука была видна во всем приложении
 
     # 5. Возвращаем JSON для Swagger и фронтенда
     return {"access_token": access_token, "token_type": "bearer"}
